@@ -13,17 +13,14 @@ def create_socketpair() -> Tuple[socket.socket, socket.socket]:
     child_sock.setblocking(True)
     return parent_sock, child_sock
 
-async def send_message(writer: asyncio.StreamWriter, message: str) -> None:
+async def send_message(sock: socket.socket, message: str, timeout: float = 1.0) -> None:
     """
-    Send a newline-terminated message.
+    Send a newline-terminated message to the child over a raw socket.
+    Uses asyncio's sock_sendall with timeout.
     """
+    loop = asyncio.get_running_loop()
     data = message.encode() + b'\n'
-    writer.write(data)
-    await writer.drain()
-
-async def read_message(reader: asyncio.StreamReader) -> str:
-    """
-    Read a newline-terminated message.
-    """
-    line: bytes = await reader.readline()
-    return line.decode().strip()
+    try:
+        await asyncio.wait_for(loop.sock_sendall(sock, data), timeout)
+    except asyncio.TimeoutError:
+        raise RuntimeError("Timed out trying to send message to child")
