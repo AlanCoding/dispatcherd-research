@@ -8,7 +8,7 @@ import sys
 from dataclasses import dataclass
 from typing import List
 
-from ipc_tools import create_socketpair, wrap_conn_for_fd, send_pickle
+from ipc_tools import create_socketpair, send_pickle
 
 
 @dataclass

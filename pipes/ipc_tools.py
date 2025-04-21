@@ -1,6 +1,5 @@
 # ipc_tools.py
 import socket
-import os
 import asyncio
 from multiprocessing.connection import Connection
 from typing import Tuple, Any
@@ -15,13 +14,6 @@ def create_socketpair() -> Tuple[socket.socket, socket.socket]:
     parent_sock.setblocking(False)
     child_sock.setblocking(True)
     return parent_sock, child_sock
-
-
-def wrap_conn_for_fd(fd: int) -> Connection:
-    """
-    Create a Connection object from an existing FD.
-    """
-    return Connection(fd)
 
 
 async def send_pickle(conn: Connection, obj: Any, timeout: float = 1.0) -> None:
