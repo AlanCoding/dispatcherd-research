@@ -1,9 +1,9 @@
 import asyncio
-import pickle
-import struct
-import socket
 import os
-from typing import Tuple, Any
+import pickle
+import socket
+import struct
+from typing import Any, Tuple
 
 
 def create_socketpair() -> Tuple[socket.socket, socket.socket]:

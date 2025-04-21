@@ -1,18 +1,18 @@
 # parent.py
 import asyncio
 import multiprocessing
-import socket
 import os
+import socket
+import sys
 from dataclasses import dataclass
 from typing import List
-import sys
 
 from ipc_tools import (
-    create_socketpair,
     asend_pickled,
-    send_pickled,
+    create_socketpair,
     read_pickled,
     read_pickled_async,
+    send_pickled,
 )
 
 
@@ -60,7 +60,9 @@ async def run() -> None:
     loop = asyncio.get_running_loop()
     reply_reader = asyncio.StreamReader()
     protocol = asyncio.StreamReaderProtocol(reply_reader)
-    transport, _ = await loop.connect_accepted_socket(lambda: protocol, reply_parent_sock)
+    transport, _ = await loop.connect_accepted_socket(
+        lambda: protocol, reply_parent_sock
+    )
 
     for i in range(num_children):
         cmd_parent_sock, cmd_child_sock = create_socketpair()
@@ -68,21 +70,19 @@ async def run() -> None:
 
         p = multiprocessing.Process(
             target=child_entry,
-            args=(cmd_child_sock.fileno(), reply_child_sock.fileno(), i)
+            args=(cmd_child_sock.fileno(), reply_child_sock.fileno(), i),
         )
         p.start()
         cmd_child_sock.close()
 
-        children.append(ChildHandle(
-            process=p,
-            command_sock=cmd_parent_sock,
-            id=i
-        ))
+        children.append(ChildHandle(process=p, command_sock=cmd_parent_sock, id=i))
 
     reply_child_sock.close()
 
     for child in children:
-        await asend_pickled(child.command_sock, f"Hello from parent to child-{child.id}")
+        await asend_pickled(
+            child.command_sock, f"Hello from parent to child-{child.id}"
+        )
 
     for _ in range(num_children):
         response = await read_pickled_async(reply_reader)
