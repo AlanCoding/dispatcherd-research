@@ -1,7 +1,10 @@
 # ipc_tools.py
 import socket
+import os
 import asyncio
-from typing import Tuple
+from multiprocessing.connection import Connection
+from typing import Tuple, Any
+
 
 def create_socketpair() -> Tuple[socket.socket, socket.socket]:
     """
@@ -13,14 +16,20 @@ def create_socketpair() -> Tuple[socket.socket, socket.socket]:
     child_sock.setblocking(True)
     return parent_sock, child_sock
 
-async def send_message(sock: socket.socket, message: str, timeout: float = 1.0) -> None:
+
+def wrap_conn_for_fd(fd: int) -> Connection:
     """
-    Send a newline-terminated message to the child over a raw socket.
-    Uses asyncio's sock_sendall with timeout.
+    Create a Connection object from an existing FD.
+    """
+    return Connection(fd)
+
+
+async def send_pickle(conn: Connection, obj: Any, timeout: float = 1.0) -> None:
+    """
+    Send a Python object using Connection.send(), in a background thread.
     """
     loop = asyncio.get_running_loop()
-    data = message.encode() + b'\n'
     try:
-        await asyncio.wait_for(loop.sock_sendall(sock, data), timeout)
+        await asyncio.wait_for(loop.run_in_executor(None, conn.send, obj), timeout)
     except asyncio.TimeoutError:
-        raise RuntimeError("Timed out trying to send message to child")
+        raise RuntimeError("Timed out sending object to child")
