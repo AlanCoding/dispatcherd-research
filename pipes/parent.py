@@ -1,4 +1,3 @@
-# parent.py
 import asyncio
 import multiprocessing
 import os
@@ -7,8 +6,13 @@ import sys
 from dataclasses import dataclass
 from typing import List
 
-from ipc_tools import (asend_pickled, create_socketpair, read_pickled,
-                       read_pickled_async, send_pickled)
+from ipc_tools import (
+    asend_pickled,
+    create_socketpair,
+    read_pickled,
+    read_pickled_async,
+    send_pickled,
+)
 
 
 @dataclass
@@ -29,23 +33,18 @@ def child_entry(command_fd: int, reply_fd: int, child_id: int) -> None:
             print(f"child-{child_id}: read failed: {e}", file=sys.stderr)
             break
 
-        print(
-            f"child-{child_id}: received msg len={len(msg)} content:\n{msg[:100]}",
-            file=sys.stderr,
-        )
+        print(f"child-{child_id}: received {msg[:100]}", file=sys.stderr)
         if msg == "exit":
             break
 
         try:
-            send_pickled(
-                reply_sock, f"child-{child_id}: got msg len={len(msg)}" + str(msg)
-            )
+            send_pickled(reply_sock, f"child-{child_id}: got len={len(msg)} msg:'{msg}'")
         except Exception as e:
             print(f"child-{child_id}: failed to send reply: {e}", file=sys.stderr)
             os._exit(1)
 
     print(f"child-{child_id}: exiting", file=sys.stderr)
-    # reply_sock.close()
+    reply_sock.close()
     os._exit(0)
 
 
@@ -53,7 +52,6 @@ async def run() -> None:
     num_children = 3
     children: List[ChildHandle] = []
 
-    # Shared reply socket
     reply_parent_sock, reply_child_sock = create_socketpair()
     reply_parent_sock.setblocking(False)
 
@@ -77,27 +75,32 @@ async def run() -> None:
 
         children.append(ChildHandle(process=p, command_sock=cmd_parent_sock, id=i))
 
+    # Keep reply_child_sock open until children are done
+
     for child in children:
         await asend_pickled(
-            child.command_sock,
-            f"Hello from parent to child-{child.id}",  # + " " + "X" * 312992
+            child.command_sock, f"Hello from parent to child-{child.id}"# + "X" * 312992
         )
 
     for _ in range(num_children):
-        response = await read_pickled_async(reply_reader)
-        print("Parent received:", response[:100])
+        try:
+            response = await read_pickled_async(reply_reader)
+            print("Parent received:", response[:100])
+        except EOFError as e:
+            print("Parent read error:", e)
 
     for child in children:
         await asend_pickled(child.command_sock, "exit")
         child.command_sock.close()
+
+    # Now it's safe to close the child end of the reply socket
+    reply_child_sock.close()
 
     transport.close()
     reply_parent_sock.close()
 
     for child in children:
         child.process.join()
-
-    reply_child_sock.close()
 
 
 if __name__ == "__main__":
