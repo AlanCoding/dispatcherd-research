@@ -7,13 +7,8 @@ import sys
 from dataclasses import dataclass
 from typing import List
 
-from ipc_tools import (
-    asend_pickled,
-    create_socketpair,
-    read_pickled,
-    read_pickled_async,
-    send_pickled,
-)
+from ipc_tools import (asend_pickled, create_socketpair, read_pickled,
+                       read_pickled_async, send_pickled)
 
 
 @dataclass
@@ -34,12 +29,17 @@ def child_entry(command_fd: int, reply_fd: int, child_id: int) -> None:
             print(f"child-{child_id}: read failed: {e}", file=sys.stderr)
             break
 
-        print(f"child-{child_id}: received msg len={len(msg)} content:\n{msg[:100]}", file=sys.stderr)
+        print(
+            f"child-{child_id}: received msg len={len(msg)} content:\n{msg[:100]}",
+            file=sys.stderr,
+        )
         if msg == "exit":
             break
 
         try:
-            send_pickled(reply_sock, f"child-{child_id}: got msg len={len(msg)}" + str(msg))
+            send_pickled(
+                reply_sock, f"child-{child_id}: got msg len={len(msg)}" + str(msg)
+            )
         except Exception as e:
             print(f"child-{child_id}: failed to send reply: {e}", file=sys.stderr)
             os._exit(1)
@@ -79,7 +79,8 @@ async def run() -> None:
 
     for child in children:
         await asend_pickled(
-            child.command_sock, f"Hello from parent to child-{child.id}"  # + " " + "X" * 312992
+            child.command_sock,
+            f"Hello from parent to child-{child.id}",  # + " " + "X" * 312992
         )
 
     for _ in range(num_children):
