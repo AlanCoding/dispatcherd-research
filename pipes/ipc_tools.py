@@ -13,6 +13,28 @@ def create_socketpair() -> Tuple[socket.socket, socket.socket]:
     return parent_sock, child_sock
 
 
+async def setup_reply_socket() -> (
+    Tuple[socket.socket, asyncio.StreamReader, asyncio.Transport]
+):
+    """
+    Create a reply socketpair and return:
+    - parent-side socket (non-blocking)
+    - associated StreamReader
+    - transport (for explicit close)
+    """
+    reply_parent_sock, reply_child_sock = create_socketpair()
+    reply_parent_sock.setblocking(False)
+
+    loop = asyncio.get_running_loop()
+    reply_reader = asyncio.StreamReader()
+    protocol = asyncio.StreamReaderProtocol(reply_reader)
+    transport, _ = await loop.connect_accepted_socket(
+        lambda: protocol, reply_parent_sock
+    )
+
+    return reply_child_sock, reply_reader, transport
+
+
 def send_pickled(sock: socket.socket, obj: Any) -> None:
     payload = pickle.dumps(obj, protocol=pickle.HIGHEST_PROTOCOL)
     header = struct.pack(">I", len(payload))

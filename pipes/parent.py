@@ -12,6 +12,7 @@ from ipc_tools import (
     read_pickled,
     read_pickled_async,
     send_pickled,
+    setup_reply_socket,
 )
 
 
@@ -38,7 +39,9 @@ def child_entry(command_fd: int, reply_fd: int, child_id: int) -> None:
             break
 
         try:
-            send_pickled(reply_sock, f"child-{child_id}: got len={len(msg)} msg:'{msg}'")
+            send_pickled(
+                reply_sock, f"child-{child_id}: got len={len(msg)} msg:'{msg}'"
+            )
         except Exception as e:
             print(f"child-{child_id}: failed to send reply: {e}", file=sys.stderr)
             os._exit(1)
@@ -52,15 +55,7 @@ async def run() -> None:
     num_children = 3
     children: List[ChildHandle] = []
 
-    reply_parent_sock, reply_child_sock = create_socketpair()
-    reply_parent_sock.setblocking(False)
-
-    loop = asyncio.get_running_loop()
-    reply_reader = asyncio.StreamReader()
-    protocol = asyncio.StreamReaderProtocol(reply_reader)
-    transport, _ = await loop.connect_accepted_socket(
-        lambda: protocol, reply_parent_sock
-    )
+    reply_child_sock, reply_reader, transport = await setup_reply_socket()
 
     for i in range(num_children):
         cmd_parent_sock, cmd_child_sock = create_socketpair()
@@ -79,7 +74,8 @@ async def run() -> None:
 
     for child in children:
         await asend_pickled(
-            child.command_sock, f"Hello from parent to child-{child.id}"# + "X" * 312992
+            child.command_sock,
+            f"Hello from parent to child-{child.id}",  # + "X" * 312992
         )
 
     for _ in range(num_children):
@@ -97,7 +93,7 @@ async def run() -> None:
     reply_child_sock.close()
 
     transport.close()
-    reply_parent_sock.close()
+    reply_child_sock.close()
 
     for child in children:
         child.process.join()
