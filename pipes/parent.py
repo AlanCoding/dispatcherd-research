@@ -34,18 +34,18 @@ def child_entry(command_fd: int, reply_fd: int, child_id: int) -> None:
             print(f"child-{child_id}: read failed: {e}", file=sys.stderr)
             break
 
-        print(f"child-{child_id}: received {msg!r}", file=sys.stderr)
+        print(f"child-{child_id}: received msg len={len(msg)} content:\n{msg[:100]}", file=sys.stderr)
         if msg == "exit":
             break
 
         try:
-            send_pickled(reply_sock, f"child-{child_id}: got '{msg}'")
+            send_pickled(reply_sock, f"child-{child_id}: got msg len={len(msg)}" + str(msg))
         except Exception as e:
             print(f"child-{child_id}: failed to send reply: {e}", file=sys.stderr)
             os._exit(1)
 
     print(f"child-{child_id}: exiting", file=sys.stderr)
-    reply_sock.close()
+    # reply_sock.close()
     os._exit(0)
 
 
@@ -77,16 +77,14 @@ async def run() -> None:
 
         children.append(ChildHandle(process=p, command_sock=cmd_parent_sock, id=i))
 
-    reply_child_sock.close()
-
     for child in children:
         await asend_pickled(
-            child.command_sock, f"Hello from parent to child-{child.id}"
+            child.command_sock, f"Hello from parent to child-{child.id}"  # + " " + "X" * 312992
         )
 
     for _ in range(num_children):
         response = await read_pickled_async(reply_reader)
-        print("Parent received:", response)
+        print("Parent received:", response[:100])
 
     for child in children:
         await asend_pickled(child.command_sock, "exit")
@@ -97,6 +95,8 @@ async def run() -> None:
 
     for child in children:
         child.process.join()
+
+    reply_child_sock.close()
 
 
 if __name__ == "__main__":
